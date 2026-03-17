@@ -536,6 +536,10 @@
                     <div class="bulk-results-header">
                         <span id="bulkResultsSummary" class="bulk-results-summary"></span>
                         <div class="bulk-results-actions">
+                            <div class="bulk-view-toggle">
+                                <button type="button" class="bulk-view-btn active" data-view="compact">Compact</button>
+                                <button type="button" class="bulk-view-btn" data-view="detail">Detail</button>
+                            </div>
                             <button type="button" class="btn btn-secondary btn-sm" id="bulkNewSearch">← Cari Lagi</button>
                             <button type="button" class="btn btn-secondary btn-sm" id="bulkExportCsv">Export CSV</button>
                         </div>

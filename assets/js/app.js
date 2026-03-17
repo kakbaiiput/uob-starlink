@@ -34,7 +34,9 @@ const bulkSearchState = {
     period: 'this-month',
     startDate: '',
     endDate: '',
-    results: []
+    results: [],
+    viewMode: 'compact',
+    lastKitList: []
 };
 
 // DOM Elements
@@ -175,6 +177,7 @@ const elements = {
     bulkResultsByKit: document.getElementById('bulkResultsByKit'),
     bulkNewSearch: document.getElementById('bulkNewSearch'),
     bulkExportCsv: document.getElementById('bulkExportCsv'),
+    bulkViewToggle: document.querySelector('.bulk-view-toggle'),
 
     // Structured Description Form Elements
     autoModeFields: document.getElementById('autoModeFields'),
@@ -2068,6 +2071,17 @@ function initBulkSearchEvents() {
 
     // Export CSV
     elements.bulkExportCsv.addEventListener('click', exportBulkSearchCsv);
+
+    // View toggle (compact / detail)
+    elements.bulkViewToggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('.bulk-view-btn');
+        if (!btn) return;
+        const view = btn.dataset.view;
+        if (view === bulkSearchState.viewMode) return;
+        bulkSearchState.viewMode = view;
+        elements.bulkViewToggle.querySelectorAll('.bulk-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+        renderBulkResultsBody(bulkSearchState.lastKitList);
+    });
 }
 
 function openBulkSearchModal() {
@@ -2075,6 +2089,13 @@ function openBulkSearchModal() {
     elements.bulkSearchForm.style.display = 'block';
     elements.bulkSearchResults.style.display = 'none';
     elements.bulkKitInput.value = '';
+
+    // Reset view to compact
+    bulkSearchState.viewMode = 'compact';
+    bulkSearchState.lastKitList = [];
+    elements.bulkViewToggle.querySelectorAll('.bulk-view-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === 'compact');
+    });
 
     // Set default period to this-month
     bulkSearchState.period = 'this-month';
@@ -2163,6 +2184,7 @@ async function runBulkSearch() {
 
         const data = await apiCall(`?${params.toString()}`);
         bulkSearchState.results = data.data;
+        bulkSearchState.lastKitList = kitList;
 
         renderBulkSearchResults(kitList, startDate, endDate);
 
@@ -2197,7 +2219,7 @@ function renderBulkSearchResults(kitList, startDate, endDate) {
         }
     }
 
-    // Summary
+    // Summary header
     let totalPemasukan = 0, totalPengeluaran = 0;
     transactions.forEach(t => {
         totalPemasukan += parseFloat(t.pemasukan);
@@ -2210,29 +2232,77 @@ function renderBulkSearchResults(kitList, startDate, endDate) {
         (periodLabel ? ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">${escapeHtml(periodLabel)}</span>` : '') +
         `<br><small style="color:var(--text-muted)">Pemasukan: ${formatRupiah(totalPemasukan)} &nbsp; Pengeluaran: ${formatRupiah(totalPengeluaran)}</small>`;
 
-    // Group transactions by KIT
+    renderBulkResultsBody(kitList);
+}
+
+function buildGrouped(kitList) {
+    const transactions = bulkSearchState.results;
     const grouped = {};
     kitList.forEach(kit => { grouped[kit] = []; });
-
     transactions.forEach(t => {
-        // Find which KIT this transaction belongs to
         const upperDesc = t.deskripsi.toUpperCase();
         for (const kit of kitList) {
             if (upperDesc.includes(kit.toUpperCase())) {
                 grouped[kit].push(t);
-                break; // assign to first matching KIT
+                break;
             }
         }
     });
+    return grouped;
+}
 
-    // Render grouped results
-    let html = '';
-    let hasAnyResult = false;
+function renderBulkResultsBody(kitList) {
+    const grouped = buildGrouped(kitList);
+    if (bulkSearchState.viewMode === 'compact') {
+        renderBulkCompact(kitList, grouped);
+    } else {
+        renderBulkDetail(kitList, grouped);
+    }
+}
+
+function renderBulkCompact(kitList, grouped) {
+    let html = `<table class="data-table bulk-compact-table">`;
+    html += `<thead><tr>
+        <th>KIT</th>
+        <th class="text-right">Transaksi</th>
+        <th class="text-right">Pemasukan</th>
+        <th class="text-right">Pengeluaran</th>
+        <th class="text-right">Selisih</th>
+        <th>Status</th>
+    </tr></thead><tbody>`;
 
     kitList.forEach(kit => {
         const kitTrans = grouped[kit] || [];
-        hasAnyResult = hasAnyResult || kitTrans.length > 0;
+        let kitPemasukan = 0, kitPengeluaran = 0;
+        kitTrans.forEach(t => {
+            kitPemasukan += parseFloat(t.pemasukan);
+            kitPengeluaran += parseFloat(t.pengeluaran);
+        });
+        const selisih = kitPemasukan - kitPengeluaran;
+        const found = kitTrans.length > 0;
 
+        html += `<tr class="${found ? '' : 'bulk-compact-empty'}">
+            <td class="bulk-compact-kit">${escapeHtml(kit)}</td>
+            <td class="text-right">${found ? kitTrans.length : '-'}</td>
+            <td class="text-right ${kitPemasukan > 0 ? 'amount-income' : ''}">${kitPemasukan > 0 ? formatRupiah(kitPemasukan) : '-'}</td>
+            <td class="text-right ${kitPengeluaran > 0 ? 'amount-expense' : ''}">${kitPengeluaran > 0 ? formatRupiah(kitPengeluaran) : '-'}</td>
+            <td class="text-right ${selisih < 0 ? 'amount-expense' : selisih > 0 ? 'amount-income' : ''}">${found ? formatRupiah(selisih) : '-'}</td>
+            <td>${found
+                ? `<span class="bulk-status-badge found">Ada</span>`
+                : `<span class="bulk-status-badge notfound">Tidak ada</span>`
+            }</td>
+        </tr>`;
+    });
+
+    html += `</tbody></table>`;
+    elements.bulkResultsByKit.innerHTML = html;
+}
+
+function renderBulkDetail(kitList, grouped) {
+    let html = '';
+
+    kitList.forEach(kit => {
+        const kitTrans = grouped[kit] || [];
         let kitPemasukan = 0, kitPengeluaran = 0;
         kitTrans.forEach(t => {
             kitPemasukan += parseFloat(t.pemasukan);
