@@ -29,6 +29,14 @@ const state = {
     isSubmitting: false
 };
 
+// Bulk Search State
+const bulkSearchState = {
+    period: 'this-month',
+    startDate: '',
+    endDate: '',
+    results: []
+};
+
 // DOM Elements
 const elements = {
     // Summary
@@ -149,6 +157,24 @@ const elements = {
     // Toast
     toast: document.getElementById('toast'),
     toastMessage: document.getElementById('toastMessage'),
+
+    // Bulk Search Modal
+    bulkSearchBtn: document.getElementById('bulkSearchBtn'),
+    bulkSearchModal: document.getElementById('bulkSearchModal'),
+    closeBulkSearchModal: document.getElementById('closeBulkSearchModal'),
+    cancelBulkSearch: document.getElementById('cancelBulkSearch'),
+    executeBulkSearch: document.getElementById('executeBulkSearch'),
+    bulkKitInput: document.getElementById('bulkKitInput'),
+    bulkPeriodGroup: document.getElementById('bulkPeriodGroup'),
+    bulkCustomDates: document.getElementById('bulkCustomDates'),
+    bulkStartDate: document.getElementById('bulkStartDate'),
+    bulkEndDate: document.getElementById('bulkEndDate'),
+    bulkSearchForm: document.getElementById('bulkSearchForm'),
+    bulkSearchResults: document.getElementById('bulkSearchResults'),
+    bulkResultsSummary: document.getElementById('bulkResultsSummary'),
+    bulkResultsByKit: document.getElementById('bulkResultsByKit'),
+    bulkNewSearch: document.getElementById('bulkNewSearch'),
+    bulkExportCsv: document.getElementById('bulkExportCsv'),
 
     // Structured Description Form Elements
     autoModeFields: document.getElementById('autoModeFields'),
@@ -527,12 +553,16 @@ function initEventListeners() {
             closeLoginModal();
             closeUserModal();
             closeUserFormModal();
+            closeBulkSearchModal();
         }
         if ((e.ctrlKey || e.metaKey) && e.key === 'n' && state.canAdd) {
             e.preventDefault();
             openModal();
         }
     });
+
+    // Bulk Search events
+    initBulkSearchEvents();
 
     // Structured Description Form Events
     initStructuredFormEvents();
@@ -2003,4 +2033,271 @@ function refreshData() {
     }, 1000);
 
     showToast('Data berhasil di-refresh', 'success');
+}
+
+// =====================
+// BULK SEARCH FUNCTIONS
+// =====================
+
+function initBulkSearchEvents() {
+    elements.bulkSearchBtn.addEventListener('click', openBulkSearchModal);
+    elements.closeBulkSearchModal.addEventListener('click', closeBulkSearchModal);
+    elements.cancelBulkSearch.addEventListener('click', closeBulkSearchModal);
+    elements.bulkSearchModal.addEventListener('click', (e) => {
+        if (e.target === elements.bulkSearchModal) closeBulkSearchModal();
+    });
+
+    // Period selector
+    elements.bulkPeriodGroup.addEventListener('click', (e) => {
+        const btn = e.target.closest('.qf-btn');
+        if (!btn) return;
+        elements.bulkPeriodGroup.querySelectorAll('.qf-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        bulkSearchState.period = btn.dataset.period;
+        elements.bulkCustomDates.style.display = bulkSearchState.period === 'custom' ? 'flex' : 'none';
+    });
+
+    // Execute search
+    elements.executeBulkSearch.addEventListener('click', runBulkSearch);
+
+    // New search button (back to form)
+    elements.bulkNewSearch.addEventListener('click', () => {
+        elements.bulkSearchResults.style.display = 'none';
+        elements.bulkSearchForm.style.display = 'block';
+    });
+
+    // Export CSV
+    elements.bulkExportCsv.addEventListener('click', exportBulkSearchCsv);
+}
+
+function openBulkSearchModal() {
+    // Reset to form view
+    elements.bulkSearchForm.style.display = 'block';
+    elements.bulkSearchResults.style.display = 'none';
+    elements.bulkKitInput.value = '';
+
+    // Set default period to this-month
+    bulkSearchState.period = 'this-month';
+    elements.bulkPeriodGroup.querySelectorAll('.qf-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.period === 'this-month');
+    });
+    elements.bulkCustomDates.style.display = 'none';
+
+    // Pre-fill custom dates with current month
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    elements.bulkStartDate.value = `${year}-${month}-01`;
+    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+    elements.bulkEndDate.value = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+
+    elements.bulkSearchModal.classList.add('active');
+    elements.bulkKitInput.focus();
+}
+
+function closeBulkSearchModal() {
+    elements.bulkSearchModal.classList.remove('active');
+}
+
+function getBulkDateRange() {
+    const now = new Date();
+    let startDate, endDate;
+
+    if (bulkSearchState.period === 'this-month') {
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+        endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    } else if (bulkSearchState.period === 'last-month') {
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const year = lastMonth.getFullYear();
+        const month = String(lastMonth.getMonth() + 1).padStart(2, '0');
+        startDate = `${year}-${month}-01`;
+        const lastDay = new Date(year, lastMonth.getMonth() + 1, 0).getDate();
+        endDate = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    } else {
+        startDate = elements.bulkStartDate.value;
+        endDate = elements.bulkEndDate.value;
+    }
+
+    return { startDate, endDate };
+}
+
+async function runBulkSearch() {
+    // Parse KIT numbers from textarea
+    const rawInput = elements.bulkKitInput.value.trim();
+    if (!rawInput) {
+        showToast('Masukkan minimal satu nomor KIT', 'error');
+        return;
+    }
+
+    // Split by newline or comma, clean up each entry
+    const kitList = rawInput
+        .split(/[\n,]+/)
+        .map(k => k.trim().toUpperCase())
+        .filter(k => k.length > 0);
+
+    if (kitList.length === 0) {
+        showToast('Tidak ada nomor KIT yang valid', 'error');
+        return;
+    }
+
+    const { startDate, endDate } = getBulkDateRange();
+    if (bulkSearchState.period === 'custom' && (!startDate || !endDate)) {
+        showToast('Pilih rentang tanggal custom', 'error');
+        return;
+    }
+
+    // Show loading state
+    const btn = elements.executeBulkSearch;
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = 'Mencari...';
+
+    try {
+        const params = new URLSearchParams({ limit: 10000 });
+        params.append('kits', kitList.join(','));
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+
+        const data = await apiCall(`?${params.toString()}`);
+        bulkSearchState.results = data.data;
+
+        renderBulkSearchResults(kitList, startDate, endDate);
+
+        // Switch to results view
+        elements.bulkSearchForm.style.display = 'none';
+        elements.bulkSearchResults.style.display = 'block';
+    } catch (error) {
+        showToast('Gagal melakukan bulk search', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.textContent = 'Cari Transaksi';
+    }
+}
+
+function renderBulkSearchResults(kitList, startDate, endDate) {
+    const transactions = bulkSearchState.results;
+
+    // Build period label
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    let periodLabel = '';
+    if (startDate && endDate) {
+        const sd = new Date(startDate + 'T00:00:00');
+        const ed = new Date(endDate + 'T00:00:00');
+        if (startDate === endDate) {
+            periodLabel = formatDate(startDate);
+        } else if (sd.getDate() === 1 && ed.getDate() === new Date(ed.getFullYear(), ed.getMonth() + 1, 0).getDate() && sd.getMonth() === ed.getMonth()) {
+            periodLabel = `${months[sd.getMonth()]} ${sd.getFullYear()}`;
+        } else {
+            periodLabel = `${formatDate(startDate)} – ${formatDate(endDate)}`;
+        }
+    }
+
+    // Summary
+    let totalPemasukan = 0, totalPengeluaran = 0;
+    transactions.forEach(t => {
+        totalPemasukan += parseFloat(t.pemasukan);
+        totalPengeluaran += parseFloat(t.pengeluaran);
+    });
+
+    elements.bulkResultsSummary.innerHTML =
+        `<strong>${kitList.length}</strong> KIT dicari &nbsp;·&nbsp; ` +
+        `<strong>${transactions.length}</strong> transaksi ditemukan` +
+        (periodLabel ? ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">${escapeHtml(periodLabel)}</span>` : '') +
+        `<br><small style="color:var(--text-muted)">Pemasukan: ${formatRupiah(totalPemasukan)} &nbsp; Pengeluaran: ${formatRupiah(totalPengeluaran)}</small>`;
+
+    // Group transactions by KIT
+    const grouped = {};
+    kitList.forEach(kit => { grouped[kit] = []; });
+
+    transactions.forEach(t => {
+        // Find which KIT this transaction belongs to
+        const upperDesc = t.deskripsi.toUpperCase();
+        for (const kit of kitList) {
+            if (upperDesc.includes(kit.toUpperCase())) {
+                grouped[kit].push(t);
+                break; // assign to first matching KIT
+            }
+        }
+    });
+
+    // Render grouped results
+    let html = '';
+    let hasAnyResult = false;
+
+    kitList.forEach(kit => {
+        const kitTrans = grouped[kit] || [];
+        hasAnyResult = hasAnyResult || kitTrans.length > 0;
+
+        let kitPemasukan = 0, kitPengeluaran = 0;
+        kitTrans.forEach(t => {
+            kitPemasukan += parseFloat(t.pemasukan);
+            kitPengeluaran += parseFloat(t.pengeluaran);
+        });
+
+        const statusClass = kitTrans.length > 0 ? 'bulk-kit-found' : 'bulk-kit-notfound';
+
+        html += `<div class="bulk-kit-group ${statusClass}">`;
+        html += `<div class="bulk-kit-header">`;
+        html += `<span class="bulk-kit-id">${escapeHtml(kit)}</span>`;
+        if (kitTrans.length > 0) {
+            html += `<span class="bulk-kit-count">${kitTrans.length} transaksi</span>`;
+            html += `<span class="bulk-kit-total">`;
+            if (kitPemasukan > 0) html += `<span class="amount-income">↑ ${formatRupiah(kitPemasukan)}</span>`;
+            if (kitPengeluaran > 0) html += `<span class="amount-expense">↓ ${formatRupiah(kitPengeluaran)}</span>`;
+            html += `</span>`;
+        } else {
+            html += `<span class="bulk-kit-empty">Tidak ada transaksi</span>`;
+        }
+        html += `</div>`;
+
+        if (kitTrans.length > 0) {
+            html += `<div class="bulk-kit-table-wrap"><table class="data-table bulk-kit-table">`;
+            html += `<thead><tr><th>Tanggal</th><th>Deskripsi</th><th class="text-right">Pemasukan</th><th class="text-right">Pengeluaran</th></tr></thead>`;
+            html += `<tbody>`;
+            kitTrans.forEach(t => {
+                html += `<tr>
+                    <td style="white-space:nowrap">${formatDate(t.tanggal)}</td>
+                    <td class="description-cell">${formatDescriptionDisplay(t.deskripsi)}</td>
+                    <td class="text-right ${parseFloat(t.pemasukan) > 0 ? 'amount-income' : ''}">${parseFloat(t.pemasukan) > 0 ? formatRupiah(t.pemasukan) : '-'}</td>
+                    <td class="text-right ${parseFloat(t.pengeluaran) > 0 ? 'amount-expense' : ''}">${parseFloat(t.pengeluaran) > 0 ? formatRupiah(t.pengeluaran) : '-'}</td>
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+        }
+
+        html += `</div>`;
+    });
+
+    elements.bulkResultsByKit.innerHTML = html;
+}
+
+function exportBulkSearchCsv() {
+    const transactions = bulkSearchState.results;
+    if (transactions.length === 0) {
+        showToast('Tidak ada data untuk diexport', 'error');
+        return;
+    }
+
+    const headers = ['No', 'Tanggal', 'Deskripsi', 'Pemasukan', 'Pengeluaran'];
+    const rows = transactions.map((t, i) => [
+        i + 1,
+        t.tanggal,
+        `"${t.deskripsi.replace(/"/g, '""')}"`,
+        t.pemasukan,
+        t.pengeluaran
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `bulk-search-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+
+    showToast(`Berhasil export ${transactions.length} transaksi`, 'success');
 }

@@ -178,6 +178,7 @@
                         <input type="date" id="endDate" title="Sampai tanggal">
                     </div>
                     <button id="resetFilters" class="btn btn-secondary btn-sm">Reset</button>
+                    <button id="bulkSearchBtn" class="btn btn-secondary btn-sm" title="Cari beberapa KIT sekaligus">🔍 Bulk Search</button>
                 </div>
             </section>
 
@@ -491,6 +492,57 @@
                     <button type="submit" class="btn btn-primary">Simpan</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Bulk Search Modal -->
+    <div class="modal" id="bulkSearchModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>🔍 Bulk Search KIT</h2>
+                <button class="modal-close" id="closeBulkSearchModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="bulk-search-form" id="bulkSearchForm">
+                    <div class="form-group">
+                        <label for="bulkKitInput">Nomor KIT <span style="font-weight:normal; color:var(--text-muted);">(satu per baris atau dipisah koma)</span></label>
+                        <textarea id="bulkKitInput" rows="5" placeholder="KIT303925311&#10;KIT303946946&#10;KIT303947000"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Periode</label>
+                        <div class="qf-group" id="bulkPeriodGroup">
+                            <button type="button" class="qf-btn active" data-period="this-month">Bulan Ini</button>
+                            <button type="button" class="qf-btn" data-period="last-month">Bulan Lalu</button>
+                            <button type="button" class="qf-btn" data-period="custom">Custom</button>
+                        </div>
+                    </div>
+                    <div class="form-row" id="bulkCustomDates" style="display:none;">
+                        <div class="form-group">
+                            <label for="bulkStartDate">Dari Tanggal</label>
+                            <input type="date" id="bulkStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="bulkEndDate">Sampai Tanggal</label>
+                            <input type="date" id="bulkEndDate">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelBulkSearch">Batal</button>
+                        <button type="button" class="btn btn-primary" id="executeBulkSearch">Cari Transaksi</button>
+                    </div>
+                </div>
+
+                <div id="bulkSearchResults" style="display:none;">
+                    <div class="bulk-results-header">
+                        <span id="bulkResultsSummary" class="bulk-results-summary"></span>
+                        <div class="bulk-results-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" id="bulkNewSearch">← Cari Lagi</button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="bulkExportCsv">Export CSV</button>
+                        </div>
+                    </div>
+                    <div id="bulkResultsByKit"></div>
+                </div>
+            </div>
         </div>
     </div>
 

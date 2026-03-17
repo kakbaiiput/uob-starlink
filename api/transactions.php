@@ -153,6 +153,22 @@ function handleGet(PDO $pdo): void {
         $where[] = '(' . implode(' OR ', $paketConditions) . ')';
     }
 
+    // KIT bulk search filter (multi-value, OR logic)
+    if (!empty($_GET['kits'])) {
+        $kitValues = explode(',', $_GET['kits']);
+        $kitConditions = [];
+        foreach ($kitValues as $kv) {
+            $trimmed = trim($kv);
+            if ($trimmed !== '') {
+                $kitConditions[] = "deskripsi LIKE ?";
+                $params[] = '%' . $trimmed . '%';
+            }
+        }
+        if (!empty($kitConditions)) {
+            $where[] = '(' . implode(' OR ', $kitConditions) . ')';
+        }
+    }
+
     $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
 
     // Pagination

@@ -1695,6 +1695,116 @@ form {
     }
 }
 
+/* =====================
+   BULK SEARCH STYLES
+   ===================== */
+
+.bulk-results-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.bulk-results-summary {
+    font-size: 0.9rem;
+    line-height: 1.8;
+}
+
+.bulk-results-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.bulk-kit-group {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.bulk-kit-group.bulk-kit-found {
+    border-color: var(--border-color);
+}
+
+.bulk-kit-group.bulk-kit-notfound {
+    border-color: var(--border-color);
+    opacity: 0.6;
+}
+
+.bulk-kit-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    background: var(--bg-tertiary);
+    flex-wrap: wrap;
+}
+
+.bulk-kit-id {
+    font-weight: 700;
+    font-size: 0.9rem;
+    font-family: monospace;
+    color: var(--primary);
+}
+
+.bulk-kit-count {
+    font-size: 0.75rem;
+    background: var(--primary);
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 1rem;
+}
+
+.bulk-kit-total {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    margin-left: auto;
+}
+
+.bulk-kit-total .amount-income {
+    color: var(--income-color);
+    font-weight: 600;
+}
+
+.bulk-kit-total .amount-expense {
+    color: var(--expense-color);
+    font-weight: 600;
+}
+
+.bulk-kit-empty {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-left: auto;
+}
+
+.bulk-kit-table-wrap {
+    overflow-x: auto;
+}
+
+.bulk-kit-table {
+    min-width: 500px;
+}
+
+.bulk-kit-table td,
+.bulk-kit-table th {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+}
+
+.bulk-period-options {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 8px;
